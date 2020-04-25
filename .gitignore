@@ -1,0 +1,5 @@
+*.pkl
+*.jpg
+*.png
+data/images/*
+data/processed/images/*
