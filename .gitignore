@@ -3,3 +3,5 @@
 *.png
 data/images/*
 data/processed/images/*
+*__pycache__*
+
