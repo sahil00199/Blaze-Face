@@ -3,6 +3,7 @@ import pickle
 import tensorflow as tf
 import os
 from tensorflow import keras
+import cv2
 
 ############################################### DATA GENERATION #####################################################
 class DataGenerator(keras.utils.Sequence):
@@ -19,14 +20,21 @@ class DataGenerator(keras.utils.Sequence):
 		self.input, self.boundingBoxes = [], []
 		for imageNumber, (imageName, annotation) in enumerate(annotations[split].items()):
 			annotation = annotation[0]
-			if annotation[2] < annotation[0]:
-				annotation[0], annotation[2] = annotation[2], annotation[0]
-			if annotation[3] < annotation[1]:
-				annotation[1], annotation[3] = annotation[3], annotation[1]
-			if annotation[3] == annotation[1] or annotation[2] == annotation[0]:
-				continue
+			annotation[2] += annotation[0]
+			annotation[3] += annotation[1]
 			self.input.append(images[imageName])
 			self.boundingBoxes.append(annotation)
+			################################## DEBUG ################################
+			# if imageNumber == 16: break
+			# if split == 'train':
+			# 	groundTruth = [int(x + 0.5) for x in annotation]
+			# 	print(imageName, groundTruth)
+			# 	image = images[imageName]
+			# 	# gt = cv2.rectangle(image, groundTruth[:2], groundTruth[2:])#, color = (255, 0, 0), thickness = 3)
+			# 	image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[0], groundTruth[1]),(255, 0, 0), thickness = 1)
+			# 	cv2.imwrite('../data/predictions/debug_' + str(imageNumber) + '.jpg', image)
+			###########################################################################
+
 		self.numSamples = len(self.input)
 		self.input = np.array(self.input)
 		self.input = (self.input - 127.5 ) / 127.5

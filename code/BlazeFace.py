@@ -3,6 +3,8 @@ from tensorflow import keras
 import numpy as np
 from network import BlazeNet, SSD
 from dataset import DataGenerator
+import cv2
+import os
 
 ##########################################  LOSS ################################################
 def smoothL1(groundTruth, predictions, globalMask):
@@ -96,7 +98,9 @@ class Model():
 				finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
 				finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
 				singleGroundTruth = dataset.convertCentreSideToBounds(groundTruthBox[i, 0, 1:])
-				print(list(zip(finalBoundingBox, singleGroundTruth))[0])
+				# print(list(zip(finalBoundingBox, singleGroundTruth))[0])
+				self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, \
+					os.path.join('../data/predictions', str(batchNumber * dataset.batchSize + i) + '.jpg'))
 
 	def evaluate(self, dataset):
 		self.model.evaluate_generator(generator = dataset,
@@ -117,6 +121,14 @@ class Model():
 		w = anchor[2] * tf.math.exp(modelOutput[2])
 		h = anchor[3] * tf.math.exp(modelOutput[3])
 		return [cx, cy, w, h]
+
+	def dumpImage(self, image, groundTruth, prediction, filename):
+		groundTruth = [int(x + 0.5) for x in groundTruth]
+		print(groundTruth[0])
+		image = (image + 1.0) * 127.5
+		# gt = cv2.rectangle(image, groundTruth[:2], groundTruth[2:])#, color = (255, 0, 0), thickness = 3)
+		image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
+		cv2.imwrite(filename, image)
 
 
 ######################################## INITILIAZATION ############################################
@@ -175,14 +187,14 @@ if __name__ == "__main__":
 	model = Model(_alpha = 0.01)
 	# print(model.model.summary())
 	print("Model prepared")
-	model.evaluate(trainingDataset)
-	model.evaluate(valDataset)
-	model.evaluate(testDataset)
-	model.train()
-	model.evaluate(trainingDataset)
-	model.evaluate(valDataset)
-	model.evaluate(testDataset)
-	model.model.save_weights('../models/try1')
+	# model.evaluate(trainingDataset)
+	model.eval(valDataset)
+	# model.evaluate(testDataset)
+	# model.train()
+	# model.evaluate(trainingDataset)
+	# model.evaluate(valDataset)
+	# model.evaluate(testDataset)
+	# model.model.save_weights('../models/try1')
 
 	# model.model.load_weights('../models/try1')
 	# model.evaluate(trainingDataset)
