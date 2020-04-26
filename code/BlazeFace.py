@@ -10,7 +10,7 @@ def smoothL1(groundTruth, predictions, globalMask):
 	diff = predictions - groundTruth
 	mask = tf.cast(tf.math.abs(diff) < 1, dtype=tf.float32)
 	loss = ((diff ** 2) * 0.5) * mask + (tf.math.abs(diff) - 0.5) * (1.0 - mask)
-	loss = tf.keras.backend.mean(loss * globalMask)
+	loss = tf.keras.backend.sum(loss * globalMask)
 	return loss
 	
 def boundingBoxLoss(groundTruth, predictions):
@@ -35,7 +35,7 @@ def smoothL1Debug(groundTruth, predictions, globalMask):
 	diff = predictions - groundTruth
 	mask = np.abs(diff) < 1
 	loss = ((diff ** 2) * 0.5) * mask + (np.abs(diff) - 0.5) * (1.0 - mask)
-	loss = np.mean(loss * globalMask)
+	loss = np.sum(loss * globalMask)
 	return loss
 	
 def boundingBoxLossDebug(groundTruth, predictions):
@@ -74,7 +74,7 @@ class Model():
 		global trainingDataset, valDataset
 		self.model.fit_generator(generator = trainingDataset,
 						   steps_per_epoch = len(trainingDataset),
-						   epochs = 1,
+						   epochs = 50,
 						   verbose = 1,
 						   validation_data = valDataset,
 						   validation_steps = len(valDataset),
@@ -172,7 +172,7 @@ if __name__ == "__main__":
 	init(trainBatchSize, testBatchSize)
 	print("Initialization Complete!")
 	print("Preparing Model...")
-	model = Model(_alpha = 10.)
+	model = Model(_alpha = 0.01)
 	# print(model.model.summary())
 	print("Model prepared")
 	model.evaluate(trainingDataset)
