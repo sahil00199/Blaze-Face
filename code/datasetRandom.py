@@ -1,46 +1,33 @@
 import numpy as np
 import pickle
 import tensorflow as tf
-import os
 from tensorflow import keras
 
 ############################################### DATA GENERATION #####################################################
 class DataGenerator(keras.utils.Sequence):
 	# taken from: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
-	def __init__(self, split, anchors, batchSize=32, shuffle=True, dataDir = '../data/processed/'):
+	def __init__(self, numSamples, anchors, batchSize=32, shuffle=True):
 		'Initialization'
+		self.anchors = anchors
+		self.numSamples = numSamples
 		self.batchSize = batchSize
 		self.shuffle = shuffle
-		self.dataDir = dataDir
-		self.anchors = anchors
 		########################## Generate the random data
-		annotations = pickle.load(open(os.path.join(self.dataDir, 'annotations.pkl'), 'rb'))
-		images = pickle.load(open(os.path.join(self.dataDir, 'images.pkl'), 'rb'))
-		self.input, self.boundingBoxes = [], []
-		for imageNumber, (imageName, annotation) in enumerate(annotations[split].items()):
-			annotation = annotation[0]
-			if annotation[2] < annotation[0]:
-				annotation[0], annotation[2] = annotation[2], annotation[0]
-			if annotation[3] < annotation[1]:
-				annotation[1], annotation[3] = annotation[3], annotation[1]
-			if annotation[3] == annotation[1] or annotation[2] == annotation[0]:
-				continue
-			self.input.append(images[imageName])
-			self.boundingBoxes.append(annotation)
-		self.numSamples = len(self.input)
-		self.input = np.array(self.input)
+		# input is 3x128 for every image
+		self.input = np.random.randint(0, 256, (numSamples, 128, 128, 3))
 		self.input = (self.input - 127.5 ) / 127.5
 		# boundingBox has 4 entries - x1, y1, x2, y2: I randomly choose x1, y1 \in [0, 128] and x2, y2 \in [128, 256]
-		self.boundingBoxes = np.array(self.boundingBoxes)
-		self.classLabels = np.asarray([self.getLabels(boundingBox) for boundingBox in self.boundingBoxes])
-		self.output = np.asarray([self.convertBoundsToCentreSide(boundingBox, labels) for boundingBox, labels in zip(self.boundingBoxes, self.classLabels)])
-		print(split, self.input.shape[0])
+		self.boundingBoxes = np.zeros((numSamples, 4))
+		self.boundingBoxes[:, :2] = np.random.randint(0, 64, (numSamples, 2))
+		self.boundingBoxes[:, 2:] = np.random.randint(64, 128, (numSamples, 2))
+		self.classLabels = [self.getLabels(boundingBox) for boundingBox in self.boundingBoxes]
+		self.output = [self.convertBoundsToCentreSide(boundingBox, labels) for boundingBox, labels in zip(self.boundingBoxes, self.classLabels)]
 		##########################
 		self.on_epoch_end()
 
 	def convertBoundsToCentreSide(self, boundingBox, labels):
-		assert boundingBox[2] >= boundingBox[0], boundingBox
-		assert boundingBox[3] >= boundingBox[1], boundingBox
+		assert boundingBox[2] > boundingBox[0], boundingBox
+		assert boundingBox[3] > boundingBox[1], boundingBox
 		w = boundingBox[2] - boundingBox[0]
 		h = boundingBox[3] - boundingBox[1]
 		cx = (boundingBox[0] + boundingBox[2]) / 2.0
@@ -55,14 +42,13 @@ class DataGenerator(keras.utils.Sequence):
 		return np.asarray([x1, y1, x2, y2])
 
 	def getLabels(self, boundingBox):
-		global anchors
 		return np.asarray([1 if self.iou(self.convertCentreSideToBounds(anchor), boundingBox) > 0.5 else 0 for anchor in self.anchors])
 
 	def iou(self, a, b):
-		assert a[2] >= a[0], a
-		assert b[2] >= b[0], b
-		assert a[3] >= a[1], a
-		assert b[3] >= b[1], b
+		assert a[2] > a[0], a
+		assert b[2] > b[0], b
+		assert a[3] > a[1], a
+		assert b[3] > b[1], b
 		intersect = [max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])]
 		if (intersect[2] > intersect[0]) and (intersect[3] > intersect[1]):
 			areaIntersection = (intersect[2] - intersect[0]) * (intersect[3] - intersect[1])
@@ -92,7 +78,5 @@ class DataGenerator(keras.utils.Sequence):
 		self.indices = np.arange(self.numSamples)
 		if self.shuffle == True:
 			np.random.shuffle(self.indices)
-#######################################################################################################
 
-if __name__ == "__main__":
-	DataGenerator('train')
+#######################################################################################################

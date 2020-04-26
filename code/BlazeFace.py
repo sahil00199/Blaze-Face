@@ -14,7 +14,7 @@ def smoothL1(groundTruth, predictions, globalMask):
 	return loss
 	
 def boundingBoxLoss(groundTruth, predictions):
-	global anchors
+	global anchors, alpha
 	# First element (of groundTruth) is the class label - which is 1 if IOU is over 0.5. That is when the loss is to be applied
 	mask = groundTruth[:, :, 0]
 	# transform the ground truth
@@ -27,13 +27,40 @@ def boundingBoxLoss(groundTruth, predictions):
 			smoothL1(gy, predictions[:, :, 1], mask) +\
 			smoothL1(gw, predictions[:, :, 2], mask) +\
 			smoothL1(gh, predictions[:, :, 3], mask)
+	return loss * alpha
+
+
+def smoothL1Debug(groundTruth, predictions, globalMask):
+	# compute smooth L1
+	diff = predictions - groundTruth
+	mask = np.abs(diff) < 1
+	loss = ((diff ** 2) * 0.5) * mask + (np.abs(diff) - 0.5) * (1.0 - mask)
+	loss = np.mean(loss * globalMask)
 	return loss
+	
+def boundingBoxLossDebug(groundTruth, predictions):
+	global anchors, alpha
+	# First element (of groundTruth) is the class label - which is 1 if IOU is over 0.5. That is when the loss is to be applied
+	mask = groundTruth[:, :, 0]
+	# transform the ground truth
+	gx = (groundTruth[:, :, 1] - anchors[:, 0]) / anchors[:, 2]
+	gy = (groundTruth[:, :, 2] - anchors[:, 1]) / anchors[:, 3]
+	gw = np.log(groundTruth[:, :, 3] / anchors[:, 2])
+	gh = np.log(groundTruth[:, :, 4] / anchors[:, 3])
+
+	loss = smoothL1Debug(gx, predictions[:, :, 0], mask) +\
+			smoothL1Debug(gy, predictions[:, :, 1], mask) +\
+			smoothL1Debug(gw, predictions[:, :, 2], mask) +\
+			smoothL1Debug(gh, predictions[:, :, 3], mask)
+	return loss * alpha
 #######################################################################################################
 
 
 class Model():
-	def __init__(self):
-		global anchors
+	def __init__(self, _alpha = 1.):
+		global anchors, alpha
+		alpha = _alpha
+		self.alpha = _alpha
 		self.anchors = anchors
 		inputs = keras.layers.Input(shape=(128, 128, 3), name = "first_input")
 		features16, features8 = BlazeNet(inputs)
@@ -44,13 +71,13 @@ class Model():
 
 	def train(self):
 		# Taken from https://medium.com/@mrgarg.rajat/training-on-large-datasets-that-dont-fit-in-memory-in-keras-60a974785d71
-		global trainingDataset, testDataset
+		global trainingDataset, valDataset
 		self.model.fit_generator(generator = trainingDataset,
 						   steps_per_epoch = len(trainingDataset),
-						   epochs = 50,
+						   epochs = 1,
 						   verbose = 1,
-						   validation_data = testDataset,
-						   validation_steps = len(testDataset),
+						   validation_data = valDataset,
+						   validation_steps = len(valDataset),
 						   shuffle = True,
 						   use_multiprocessing = False
 						)
@@ -64,6 +91,7 @@ class Model():
 			predictedLabels, predictedBoxes = self.model.predict_on_batch(currentInput)
 			predictedLabels = predictedLabels.numpy()
 			predictedBoxes = predictedBoxes.numpy()
+			# loss = boundingBoxLossDebug(groundTruthBox, predictedBoxes)
 			for i, (singlePredictedLabels, singlePredictedBoxes) in enumerate(zip(predictedLabels, predictedBoxes)):
 				finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
 				finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
@@ -92,8 +120,9 @@ class Model():
 
 
 ######################################## INITILIAZATION ############################################
-trainingDataset, testDataset = None, None
+trainingDataset, valDataset, testDataset = None, None, None
 anchors = None
+alpha = None
 
 def generateAnchors():
 	# CHECK - Not sure about this stuff!
@@ -123,10 +152,11 @@ def generateAnchors():
 	assert count == 896
 
 def init(trainBatchSize, testBatchSize):
-	global trainingDataset, testDataset, anchor
+	global trainingDataset, valDataset, testDataset, anchor
 	generateAnchors()
-	trainingDataset = DataGenerator(8, anchors, batchSize = trainBatchSize, shuffle = False)
-	testDataset = DataGenerator(32, anchors, batchSize = testBatchSize, shuffle = False)
+	trainingDataset = DataGenerator('train', anchors, batchSize = trainBatchSize, shuffle = False)
+	valDataset = DataGenerator('val', anchors, batchSize = testBatchSize, shuffle = False)
+	testDataset = DataGenerator('test', anchors, batchSize = testBatchSize, shuffle = False)
 	return
 
 #######################################################################################################
@@ -142,15 +172,20 @@ if __name__ == "__main__":
 	init(trainBatchSize, testBatchSize)
 	print("Initialization Complete!")
 	print("Preparing Model...")
-	model = Model()
+	model = Model(_alpha = 10.)
 	# print(model.model.summary())
 	print("Model prepared")
-	# print("Training...")
-	# model.train()
-	# print("Training Done!")
-	print("Running inference...")
-	for i in range(1):
-		print('*' * 75 + str(i) + '*' * 75)
-		model.train()
-		model.eval(trainingDataset)
-	print("Inference done")
+	model.evaluate(trainingDataset)
+	model.evaluate(valDataset)
+	model.evaluate(testDataset)
+	model.train()
+	model.evaluate(trainingDataset)
+	model.evaluate(valDataset)
+	model.evaluate(testDataset)
+	model.model.save_weights('../models/try1')
+
+	# model.model.load_weights('../models/try1')
+	# model.evaluate(trainingDataset)
+	# model.evaluate(valDataset)
+	# model.evaluate(testDataset)
+

@@ -4,4 +4,6 @@
 data/images/*
 data/processed/images/*
 *__pycache__*
+models*
+*.DS_Store*
 
