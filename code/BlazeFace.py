@@ -124,10 +124,11 @@ class Model():
 
 	def dumpImage(self, image, groundTruth, prediction, filename):
 		groundTruth = [int(x + 0.5) for x in groundTruth]
-		print(groundTruth[0])
+		prediction = [int(x + 0.5) for x in prediction]
+		print(list(zip(prediction, groundTruth)))
 		image = (image + 1.0) * 127.5
-		# gt = cv2.rectangle(image, groundTruth[:2], groundTruth[2:])#, color = (255, 0, 0), thickness = 3)
 		image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
+		image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
 		cv2.imwrite(filename, image)
 
 

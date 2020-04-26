@@ -7,4 +7,4 @@ data/processed/images/*
 models*
 *.DS_Store*
 *.zip
-
+*.csv

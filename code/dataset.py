@@ -25,7 +25,7 @@ class DataGenerator(keras.utils.Sequence):
 			self.input.append(images[imageName])
 			self.boundingBoxes.append(annotation)
 			################################## DEBUG ################################
-			# if imageNumber == 16: break
+			if imageNumber == 16: break
 			# if split == 'train':
 			# 	groundTruth = [int(x + 0.5) for x in annotation]
 			# 	print(imageName, groundTruth)
