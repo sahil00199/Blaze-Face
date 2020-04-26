@@ -6,7 +6,9 @@ annotations = {}
 images = {}
 
 count = 0
-for inputFile in ['mnist_test.csv', 'mnist_train.csv']:
+for split in ['train', 'test', 'val']:
+	inputFile = 'mnist_' + split + '.csv'
+	annotations[split] = {}
 	file = open(inputFile, 'r')
 	lines = file.readlines()
 	file.close()
@@ -22,9 +24,15 @@ for inputFile in ['mnist_test.csv', 'mnist_train.csv']:
 		x = np.random.randint(0, 128 - finalShape)
 		y = np.random.randint(0, 128 - finalShape)
 		image[x:x + finalShape, y:y + finalShape] = number
-		image = image.reshape(128, 128, 1)
+		image = image.reshape(128, 128, 1).astype('uint8')
 		images[count] = image
-		annotations[count] = [x, y, finalShape, finalShape]
+		annotations[split][count] = [y, x, finalShape, finalShape]
 		count += 1
+		if count == 25000: break
+		if count == 30000: break
+		if count == 35000: break
+
+pickle.dump(images, open("processed/images.pkl", 'wb'))
+pickle.dump(annotations, open("processed/annotations.pkl", 'wb'))
 
 

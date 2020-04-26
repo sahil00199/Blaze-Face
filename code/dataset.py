@@ -19,13 +19,15 @@ class DataGenerator(keras.utils.Sequence):
 		images = pickle.load(open(os.path.join(self.dataDir, 'images.pkl'), 'rb'))
 		self.input, self.boundingBoxes = [], []
 		for imageNumber, (imageName, annotation) in enumerate(annotations[split].items()):
-			annotation = annotation[0]
 			annotation[2] += annotation[0]
 			annotation[3] += annotation[1]
 			self.input.append(images[imageName])
 			self.boundingBoxes.append(annotation)
+			if split == 'train':
+				if imageNumber == 5000: break
+			else:
+				if imageNumber == 1000: break
 			################################## DEBUG ################################
-			if imageNumber == 16: break
 			# if split == 'train':
 			# 	groundTruth = [int(x + 0.5) for x in annotation]
 			# 	print(imageName, groundTruth)
@@ -40,7 +42,7 @@ class DataGenerator(keras.utils.Sequence):
 		self.input = (self.input - 127.5 ) / 127.5
 		# boundingBox has 4 entries - x1, y1, x2, y2: I randomly choose x1, y1 \in [0, 128] and x2, y2 \in [128, 256]
 		self.boundingBoxes = np.array(self.boundingBoxes)
-		self.classLabels = np.asarray([self.getLabels(boundingBox) for boundingBox in self.boundingBoxes])
+		self.classLabels = np.asarray([self.getLabels(i, boundingBox) for i, boundingBox in enumerate(self.boundingBoxes)])
 		self.output = np.asarray([self.convertBoundsToCentreSide(boundingBox, labels) for boundingBox, labels in zip(self.boundingBoxes, self.classLabels)])
 		print(split, self.input.shape[0])
 		##########################
@@ -62,15 +64,16 @@ class DataGenerator(keras.utils.Sequence):
 		y2 = centreSide[1] + (centreSide[3]) / 2.0
 		return np.asarray([x1, y1, x2, y2])
 
-	def getLabels(self, boundingBox):
+	def getLabels(self, index, boundingBox):
 		global anchors
+		if index % 500 == 0: print(index)
 		return np.asarray([1 if self.iou(self.convertCentreSideToBounds(anchor), boundingBox) > 0.5 else 0 for anchor in self.anchors])
 
 	def iou(self, a, b):
-		assert a[2] >= a[0], a
-		assert b[2] >= b[0], b
-		assert a[3] >= a[1], a
-		assert b[3] >= b[1], b
+		# assert a[2] >= a[0], a
+		# assert b[2] >= b[0], b
+		# assert a[3] >= a[1], a
+		# assert b[3] >= b[1], b
 		intersect = [max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])]
 		if (intersect[2] > intersect[0]) and (intersect[3] > intersect[1]):
 			areaIntersection = (intersect[2] - intersect[0]) * (intersect[3] - intersect[1])

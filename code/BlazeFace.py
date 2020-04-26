@@ -64,7 +64,7 @@ class Model():
 		alpha = _alpha
 		self.alpha = _alpha
 		self.anchors = anchors
-		inputs = keras.layers.Input(shape=(128, 128, 3), name = "first_input")
+		inputs = keras.layers.Input(shape=(128, 128, 1), name = "first_input")
 		features16, features8 = BlazeNet(inputs)
 		output = SSD(features16, features8)
 		self.model = tf.keras.models.Model(inputs=inputs, outputs=output)
@@ -122,11 +122,15 @@ class Model():
 		h = anchor[3] * tf.math.exp(modelOutput[3])
 		return [cx, cy, w, h]
 
-	def dumpImage(self, image, groundTruth, prediction, filename):
+	def dumpImage(self, greyscaleImage, groundTruth, prediction, filename):
 		groundTruth = [int(x + 0.5) for x in groundTruth]
 		prediction = [int(x + 0.5) for x in prediction]
 		print(list(zip(prediction, groundTruth)))
-		image = (image + 1.0) * 127.5
+		greyscaleImage = (greyscaleImage + 1.0) * 127.5
+		image = np.zeros((128, 128, 3))
+		image[:, :, 0:1] = greyscaleImage
+		image[:, :, 1:2] = greyscaleImage
+		image[:, :, 2:3] = greyscaleImage
 		image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
 		image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
 		cv2.imwrite(filename, image)
@@ -189,13 +193,13 @@ if __name__ == "__main__":
 	# print(model.model.summary())
 	print("Model prepared")
 	# model.evaluate(trainingDataset)
-	model.eval(valDataset)
-	# model.evaluate(testDataset)
-	# model.train()
-	# model.evaluate(trainingDataset)
-	# model.evaluate(valDataset)
-	# model.evaluate(testDataset)
-	# model.model.save_weights('../models/try1')
+	model.evaluate(valDataset)
+	model.evaluate(testDataset)
+	model.train()
+	model.evaluate(trainingDataset)
+	model.evaluate(valDataset)
+	model.evaluate(testDataset)
+	model.model.save_weights('../models/try1')
 
 	# model.model.load_weights('../models/try1')
 	# model.evaluate(trainingDataset)
