@@ -8,28 +8,31 @@ import cv2
 ############################################### DATA GENERATION #####################################################
 class DataGenerator(keras.utils.Sequence):
 	# taken from: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
-	def __init__(self, split, anchors, batchSize=32, shuffle=True, dataDir = '../data/processed/'):
+	def __init__(self, split, anchors, numClasses = 10, batchSize=32, shuffle=True, dataDir = '../data/processed/'):
 		'Initialization'
 		self.batchSize = batchSize
 		self.shuffle = shuffle
 		self.dataDir = dataDir
 		self.anchors = anchors
+		self.numClasses = numClasses
 		########################## Generate the random data
 		annotations = pickle.load(open(os.path.join(self.dataDir, 'annotations.pkl'), 'rb'))
 		images = pickle.load(open(os.path.join(self.dataDir, 'images.pkl'), 'rb'))
-		self.input, self.boundingBoxes = [], []
+		self.input, self.boundingBoxes, self.classLabels = [], [], []
 		for imageNumber, (imageName, annotation) in enumerate(annotations[split].items()):
-			annotation[2] += annotation[0]
-			annotation[3] += annotation[1]
+			classLabel, boundingBox = annotation
+			boundingBox[2] += boundingBox[0]
+			boundingBox[3] += boundingBox[1]
 			self.input.append(images[imageName])
-			self.boundingBoxes.append(annotation)
-			if split == 'train':
-				if imageNumber == 5000: break
-			else:
-				if imageNumber == 1000: break
-			################################## DEBUG ################################
+			self.classLabels.append(self.getLabels(classLabel, boundingBox, imageNumber))
+			self.boundingBoxes.append(boundingBox)
+			# ################################# DEBUG ################################
 			# if split == 'train':
-			# 	groundTruth = [int(x + 0.5) for x in annotation]
+			# 	if imageNumber == 63: break
+			# else:
+			# 	if imageNumber == 15: break
+			# if split == 'train':
+			# 	groundTruth = [int(x + 0.5) for x in boundingBox]
 			# 	print(imageName, groundTruth)
 			# 	image = images[imageName]
 			# 	# gt = cv2.rectangle(image, groundTruth[:2], groundTruth[2:])#, color = (255, 0, 0), thickness = 3)
@@ -40,10 +43,10 @@ class DataGenerator(keras.utils.Sequence):
 		self.numSamples = len(self.input)
 		self.input = np.array(self.input)
 		self.input = (self.input - 127.5 ) / 127.5
-		# boundingBox has 4 entries - x1, y1, x2, y2: I randomly choose x1, y1 \in [0, 128] and x2, y2 \in [128, 256]
 		self.boundingBoxes = np.array(self.boundingBoxes)
-		self.classLabels = np.asarray([self.getLabels(i, boundingBox) for i, boundingBox in enumerate(self.boundingBoxes)])
 		self.output = np.asarray([self.convertBoundsToCentreSide(boundingBox, labels) for boundingBox, labels in zip(self.boundingBoxes, self.classLabels)])
+		self.classLabels = np.asarray(self.classLabels)
+		self.classLabels = keras.utils.to_categorical(self.classLabels, num_classes = numClasses + 1)
 		print(split, self.input.shape[0])
 		##########################
 		self.on_epoch_end()
@@ -55,7 +58,7 @@ class DataGenerator(keras.utils.Sequence):
 		h = boundingBox[3] - boundingBox[1]
 		cx = (boundingBox[0] + boundingBox[2]) / 2.0
 		cy = (boundingBox[1] + boundingBox[3]) / 2.0
-		return np.array([[label, cx, cy, w, h] for label in labels])
+		return np.array([[0 if label == self.numClasses else 1, cx, cy, w, h] for label in labels])
 
 	def convertCentreSideToBounds(self, centreSide):
 		x1 = centreSide[0] - (centreSide[2]) / 2.0
@@ -64,10 +67,10 @@ class DataGenerator(keras.utils.Sequence):
 		y2 = centreSide[1] + (centreSide[3]) / 2.0
 		return np.asarray([x1, y1, x2, y2])
 
-	def getLabels(self, index, boundingBox):
+	def getLabels(self, classLabel, boundingBox, index):
 		global anchors
 		if index % 500 == 0: print(index)
-		return np.asarray([1 if self.iou(self.convertCentreSideToBounds(anchor), boundingBox) > 0.5 else 0 for anchor in self.anchors])
+		return np.asarray([classLabel if self.iou(self.convertCentreSideToBounds(anchor), boundingBox) > 0.5 else self.numClasses for anchor in self.anchors])
 
 	def iou(self, a, b):
 		# assert a[2] >= a[0], a
@@ -84,6 +87,9 @@ class DataGenerator(keras.utils.Sequence):
 		areaUnion = areaA + areaB - areaIntersection
 		assert areaIntersection >= -0.0001
 		assert areaUnion >= -0.0001
+		# Also, make sure that sides are not too different:
+		sideRatio = float(a[2] - a[0]) /float(b[2] - b[0])
+		if sideRatio < 1./2. or sideRatio > 2.: return 0. 
 		return areaIntersection / areaUnion
 
 	def __len__(self):

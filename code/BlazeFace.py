@@ -59,24 +59,25 @@ def boundingBoxLossDebug(groundTruth, predictions):
 
 
 class Model():
-	def __init__(self, _alpha = 1.):
+	def __init__(self, _alpha = 1., numClasses = 10):
 		global anchors, alpha
 		alpha = _alpha
+		self.numClasses = numClasses
 		self.alpha = _alpha
 		self.anchors = anchors
 		inputs = keras.layers.Input(shape=(128, 128, 1), name = "first_input")
 		features16, features8 = BlazeNet(inputs)
-		output = SSD(features16, features8)
+		output = SSD(features16, features8, numClasses)
 		self.model = tf.keras.models.Model(inputs=inputs, outputs=output)
 		optimizer = tf.keras.optimizers.Adam(amsgrad=True)
-		self.model.compile(loss=['binary_crossentropy', boundingBoxLoss], optimizer=optimizer)
+		self.model.compile(loss=['categorical_crossentropy', boundingBoxLoss], optimizer=optimizer)
 
-	def train(self):
+	def train(self, numEpochs):
 		# Taken from https://medium.com/@mrgarg.rajat/training-on-large-datasets-that-dont-fit-in-memory-in-keras-60a974785d71
 		global trainingDataset, valDataset
 		self.model.fit_generator(generator = trainingDataset,
 						   steps_per_epoch = len(trainingDataset),
-						   epochs = 50,
+						   epochs = numEpochs,
 						   verbose = 1,
 						   validation_data = valDataset,
 						   validation_steps = len(valDataset),
@@ -95,12 +96,14 @@ class Model():
 			predictedBoxes = predictedBoxes.numpy()
 			# loss = boundingBoxLossDebug(groundTruthBox, predictedBoxes)
 			for i, (singlePredictedLabels, singlePredictedBoxes) in enumerate(zip(predictedLabels, predictedBoxes)):
-				finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
+				classPrediction, finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
+				print(classPrediction, groundTruthLabels[i, :, :self.numClasses].argmax() % self.numClasses)
 				finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
+				print(groundTruthLabels.shape, groundTruthBox.shape)
 				singleGroundTruth = dataset.convertCentreSideToBounds(groundTruthBox[i, 0, 1:])
 				# print(list(zip(finalBoundingBox, singleGroundTruth))[0])
-				self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, \
-					os.path.join('../data/predictions', str(batchNumber * dataset.batchSize + i) + '.jpg'))
+				self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, classPrediction, \
+					os.path.join('../predictions', str(batchNumber * dataset.batchSize + i) + '.jpg'))
 
 	def evaluate(self, dataset):
 		self.model.evaluate_generator(generator = dataset,
@@ -110,8 +113,11 @@ class Model():
 
 	def eliminateMultiple(self, labels, boxes):
 		# Change this function to take into consideration multiple boxes which need to be averaged
-		maxIndex = np.argmax(labels)
-		return self.scaleToCentreSide(boxes[maxIndex], self.anchors[maxIndex])
+		labels = labels[:, :self.numClasses]
+		argmax = np.argmax(labels)
+		maxIndex = argmax // (self.numClasses)
+		classPrediction = argmax % (self.numClasses)
+		return classPrediction, self.scaleToCentreSide(boxes[maxIndex], self.anchors[maxIndex])
 
 	def scaleToCentreSide(self, modelOutput, anchor):
 		# Model outputs need to be scaled to actually arrive at the centre and sides of the box
@@ -122,10 +128,10 @@ class Model():
 		h = anchor[3] * tf.math.exp(modelOutput[3])
 		return [cx, cy, w, h]
 
-	def dumpImage(self, greyscaleImage, groundTruth, prediction, filename):
+	def dumpImage(self, greyscaleImage, groundTruth, prediction, classPrediction, filename):
 		groundTruth = [int(x + 0.5) for x in groundTruth]
 		prediction = [int(x + 0.5) for x in prediction]
-		print(list(zip(prediction, groundTruth)))
+		# print(list(zip(prediction, groundTruth)))
 		greyscaleImage = (greyscaleImage + 1.0) * 127.5
 		image = np.zeros((128, 128, 3))
 		image[:, :, 0:1] = greyscaleImage
@@ -133,6 +139,8 @@ class Model():
 		image[:, :, 2:3] = greyscaleImage
 		image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
 		image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
+		cv2.putText(image, str(classPrediction),(0, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,255,0), 1)
+
 		cv2.imwrite(filename, image)
 
 
@@ -189,17 +197,18 @@ if __name__ == "__main__":
 	init(trainBatchSize, testBatchSize)
 	print("Initialization Complete!")
 	print("Preparing Model...")
-	model = Model(_alpha = 0.01)
-	# print(model.model.summary())
+	model = Model(_alpha = 0.)
+	# model.model.summary()
 	print("Model prepared")
-	# model.evaluate(trainingDataset)
-	model.evaluate(valDataset)
-	model.evaluate(testDataset)
-	model.train()
 	model.evaluate(trainingDataset)
 	model.evaluate(valDataset)
 	model.evaluate(testDataset)
-	model.model.save_weights('../models/try1')
+	model.train(5)
+	model.evaluate(trainingDataset)
+	model.evaluate(valDataset)
+	model.evaluate(testDataset)
+	model.eval(testDataset)
+	model.model.save_weights('../models/try0')
 
 	# model.model.load_weights('../models/try1')
 	# model.evaluate(trainingDataset)

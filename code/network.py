@@ -62,17 +62,17 @@ def BlazeNet(x):
 
 	return [x4, x5]
 
-def SSD(features16, features8):
+def SSD(features16, features8, numClasses):
 	# For each anchor, 5 outputs are needed
-	preds16 = keras.layers.Conv2D(2 * 5, 3, strides=1, padding='same', data_format='channels_last', name = "16x16_conv")(features16)
-	preds16 = keras.layers.Reshape((16 * 16 * 2, 5), name = "16x16_reshape")(preds16)
-	classLabels16 = keras.layers.Activation('sigmoid', name='16x16_activation')(preds16[:, :, :1])
-	boundingBox16 = preds16[:, :, 1:]
+	preds16 = keras.layers.Conv2D(2 * (5 + numClasses), 3, strides=1, padding='same', data_format='channels_last', name = "16x16_conv")(features16)
+	preds16 = keras.layers.Reshape((16 * 16 * 2, 5 + numClasses), name = "16x16_reshape")(preds16)
+	classLabels16 = keras.layers.Softmax(axis = 2, name='16x16_activation')(preds16[:, :, :numClasses + 1])
+	boundingBox16 = preds16[:, :, 1 + numClasses:]
 
-	preds8 = keras.layers.Conv2D(6 * 5, 3, strides=1, padding='same', data_format='channels_last', name = "8x8_conv")(features8)
-	preds8 = keras.layers.Reshape((8 * 8 * 6, 5), name = "8x8_reshape")(preds8)
-	classLabels8 = keras.layers.Activation('sigmoid', name = "8x8_activation")(preds8[:, :, :1])
-	boundingBox8 = preds8[:, :, 1:]
+	preds8 = keras.layers.Conv2D(6 * (5 + numClasses), 3, strides=1, padding='same', data_format='channels_last', name = "8x8_conv")(features8)
+	preds8 = keras.layers.Reshape((8 * 8 * 6, 5 + numClasses), name = "8x8_reshape")(preds8)
+	classLabels8 = keras.layers.Softmax(axis = 2, name = "8x8_activation")(preds8[:, :, :numClasses + 1])
+	boundingBox8 = preds8[:, :, 1 + numClasses:]
 
 	boundingBox = tf.keras.layers.Concatenate(axis=1, name='concat_bounding_box')([boundingBox16, boundingBox8])
 	boundingBox = tf.keras.backend.clip(boundingBox, -1, 1)

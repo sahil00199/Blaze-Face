@@ -16,6 +16,7 @@ for split in ['train', 'test', 'val']:
 		line = line.strip().split(',')
 		if len(line) == 0:
 			continue
+		label = int(line[0])
 		line = [int(x.strip()) for x in line[1:]]
 		image = np.zeros((128, 128))
 		number = np.array(line).reshape(28, 28).astype('float32')
@@ -26,7 +27,7 @@ for split in ['train', 'test', 'val']:
 		image[x:x + finalShape, y:y + finalShape] = number
 		image = image.reshape(128, 128, 1).astype('uint8')
 		images[count] = image
-		annotations[split][count] = [y, x, finalShape, finalShape]
+		annotations[split][count] = (label, [y, x, finalShape, finalShape])
 		count += 1
 		if count == 25000: break
 		if count == 30000: break
