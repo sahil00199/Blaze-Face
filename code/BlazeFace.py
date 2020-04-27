@@ -59,88 +59,88 @@ def boundingBoxLossDebug(groundTruth, predictions):
 
 
 class Model():
-	def __init__(self, _alpha = 1., numClasses = 10):
-		global anchors, alpha
-		alpha = _alpha
-		self.numClasses = numClasses
-		self.alpha = _alpha
-		self.anchors = anchors
-		inputs = keras.layers.Input(shape=(128, 128, 1), name = "first_input")
-		features16, features8 = BlazeNet(inputs)
-		output = SSD(features16, features8, numClasses)
-		self.model = tf.keras.models.Model(inputs=inputs, outputs=output)
-		optimizer = tf.keras.optimizers.Adam(amsgrad=True)
-		self.model.compile(loss=['categorical_crossentropy', boundingBoxLoss], optimizer=optimizer)
+        def __init__(self, _alpha = 1., numClasses = 10):
+                global anchors, alpha
+                alpha = _alpha
+                self.numClasses = numClasses
+                self.alpha = _alpha
+                self.anchors = anchors
+                inputs = keras.layers.Input(shape=(128, 128, 1), name = "first_input")
+                features16, features8 = BlazeNet(inputs)
+                output = SSD(features16, features8, numClasses)
+                self.model = tf.keras.models.Model(inputs=inputs, outputs=output)
+                optimizer = tf.keras.optimizers.Adam(amsgrad=True)
+                self.model.compile(loss=['categorical_crossentropy', boundingBoxLoss], optimizer=optimizer)
 
-	def train(self, numEpochs):
-		# Taken from https://medium.com/@mrgarg.rajat/training-on-large-datasets-that-dont-fit-in-memory-in-keras-60a974785d71
-		global trainingDataset, valDataset
-		self.model.fit_generator(generator = trainingDataset,
-						   steps_per_epoch = len(trainingDataset),
-						   epochs = numEpochs,
-						   verbose = 1,
-						   validation_data = valDataset,
-						   validation_steps = len(valDataset),
-						   shuffle = True,
-						   use_multiprocessing = False
-						)
+        def train(self, numEpochs):
+                # Taken from https://medium.com/@mrgarg.rajat/training-on-large-datasets-that-dont-fit-in-memory-in-keras-60a974785d71
+                global trainingDataset, valDataset
+                self.model.fit_generator(generator = trainingDataset,
+                                                   steps_per_epoch = len(trainingDataset),
+                                                   epochs = numEpochs,
+                                                   verbose = 1,
+                                                   validation_data = valDataset,
+                                                   validation_steps = len(valDataset),
+                                                   shuffle = True,
+                                                   use_multiprocessing = False
+                                                )
 
-	def eval(self, dataset):
-		dataset.on_epoch_end() 
-		batchSize = dataset.batchSize
-		numBatches = (dataset.numSamples + batchSize - 1) // batchSize
-		for batchNumber in range(numBatches):
-			currentInput, (groundTruthLabels, groundTruthBox) = dataset.__getitem__(batchNumber)
-			predictedLabels, predictedBoxes = self.model.predict_on_batch(currentInput)
-			predictedLabels = predictedLabels.numpy()
-			predictedBoxes = predictedBoxes.numpy()
-			# loss = boundingBoxLossDebug(groundTruthBox, predictedBoxes)
-			for i, (singlePredictedLabels, singlePredictedBoxes) in enumerate(zip(predictedLabels, predictedBoxes)):
-				classPrediction, finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
-				print(classPrediction, groundTruthLabels[i, :, :self.numClasses].argmax() % self.numClasses)
-				finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
-				print(groundTruthLabels.shape, groundTruthBox.shape)
-				singleGroundTruth = dataset.convertCentreSideToBounds(groundTruthBox[i, 0, 1:])
-				# print(list(zip(finalBoundingBox, singleGroundTruth))[0])
-				self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, classPrediction, \
-					os.path.join('../predictions', str(batchNumber * dataset.batchSize + i) + '.jpg'))
+        def eval(self, dataset):
+                dataset.on_epoch_end() 
+                batchSize = dataset.batchSize
+                numBatches = (dataset.numSamples + batchSize - 1) // batchSize
+                for batchNumber in range(numBatches):
+                        currentInput, (groundTruthLabels, groundTruthBox) = dataset.__getitem__(batchNumber)
+                        predictedLabels, predictedBoxes = self.model.predict_on_batch(currentInput)
+                        predictedLabels = predictedLabels.numpy()
+                        predictedBoxes = predictedBoxes.numpy()
+                        # loss = boundingBoxLossDebug(groundTruthBox, predictedBoxes)
+                        for i, (singlePredictedLabels, singlePredictedBoxes) in enumerate(zip(predictedLabels, predictedBoxes)):
+                                classPrediction, finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
+                                print(classPrediction, groundTruthLabels[i, :, :self.numClasses].argmax() % self.numClasses)
+                                finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
+                                print(groundTruthLabels.shape, groundTruthBox.shape)
+                                singleGroundTruth = dataset.convertCentreSideToBounds(groundTruthBox[i, 0, 1:])
+                                # print(list(zip(finalBoundingBox, singleGroundTruth))[0])
+                                self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, classPrediction, \
+                                        os.path.join('../predictions', str(batchNumber * dataset.batchSize + i) + '.jpg'))
 
-	def evaluate(self, dataset):
-		self.model.evaluate_generator(generator = dataset,
-						   verbose = 1,
-						   use_multiprocessing = False
-						)
+        def evaluate(self, dataset):
+                self.model.evaluate_generator(generator = dataset,
+                                                   verbose = 1,
+                                                   use_multiprocessing = False
+                                                )
 
-	def eliminateMultiple(self, labels, boxes):
-		# Change this function to take into consideration multiple boxes which need to be averaged
-		labels = labels[:, :self.numClasses]
-		argmax = np.argmax(labels)
-		maxIndex = argmax // (self.numClasses)
-		classPrediction = argmax % (self.numClasses)
-		return classPrediction, self.scaleToCentreSide(boxes[maxIndex], self.anchors[maxIndex])
+        def eliminateMultiple(self, labels, boxes):
+                # Change this function to take into consideration multiple boxes which need to be averaged
+                labels = labels[:, :self.numClasses]
+                argmax = np.argmax(labels)
+                maxIndex = argmax // (self.numClasses)
+                classPrediction = argmax % (self.numClasses)
+                return classPrediction, self.scaleToCentreSide(boxes[maxIndex], self.anchors[maxIndex])
 
-	def scaleToCentreSide(self, modelOutput, anchor):
-		# Model outputs need to be scaled to actually arrive at the centre and sides of the box
-		assert modelOutput.shape == anchor.shape, print(modelOutput.shape, anchor.shape)
-		cx = anchor[0] + anchor[2] * modelOutput[0]
-		cy = anchor[1] + anchor[3] * modelOutput[1]
-		w = anchor[2] * tf.math.exp(modelOutput[2])
-		h = anchor[3] * tf.math.exp(modelOutput[3])
-		return [cx, cy, w, h]
+        def scaleToCentreSide(self, modelOutput, anchor):
+                # Model outputs need to be scaled to actually arrive at the centre and sides of the box
+                assert modelOutput.shape == anchor.shape, print(modelOutput.shape, anchor.shape)
+                cx = anchor[0] + anchor[2] * modelOutput[0]
+                cy = anchor[1] + anchor[3] * modelOutput[1]
+                w = anchor[2] * tf.math.exp(modelOutput[2])
+                h = anchor[3] * tf.math.exp(modelOutput[3])
+                return [cx, cy, w, h]
 
-	def dumpImage(self, greyscaleImage, groundTruth, prediction, classPrediction, filename):
-		groundTruth = [int(x + 0.5) for x in groundTruth]
-		prediction = [int(x + 0.5) for x in prediction]
-		# print(list(zip(prediction, groundTruth)))
-		greyscaleImage = (greyscaleImage + 1.0) * 127.5
-		image = np.zeros((128, 128, 3))
-		image[:, :, 0:1] = greyscaleImage
-		image[:, :, 1:2] = greyscaleImage
-		image[:, :, 2:3] = greyscaleImage
-		image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
-		image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
-		cv2.putText(image, str(classPrediction),(0, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,255,0), 1)
-		cv2.imwrite(filename, image)
+        def dumpImage(self, greyscaleImage, groundTruth, prediction, classPrediction, filename):
+                groundTruth = [int(x + 0.5) for x in groundTruth]
+                prediction = [int(x + 0.5) for x in prediction]
+                # print(list(zip(prediction, groundTruth)))
+                greyscaleImage = (greyscaleImage + 1.0) * 127.5
+                image = np.zeros((128, 128, 3))
+                image[:, :, 0:1] = greyscaleImage
+                image[:, :, 1:2] = greyscaleImage
+                image[:, :, 2:3] = greyscaleImage
+                image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
+                image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
+                cv2.putText(image, str(classPrediction),(0, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,255,0), 1)
+                cv2.imwrite(filename, image)
 
 
 ######################################## INITILIAZATION ############################################
@@ -189,28 +189,40 @@ def init(trainBatchSize, testBatchSize):
 
 
 if __name__ == "__main__":
-	with tf.device("/gpu:0")
-		np.random.seed(7)
-		# Some things taken from https://github.com/benuri/BlazeFace.git
-		trainBatchSize, testBatchSize = 8, 16
-		print("Initializing...")
-		init(trainBatchSize, testBatchSize)
-		print("Initialization Complete!")
-		print("Preparing Model...")
-		model = Model(_alpha = 0.)
-		# model.model.summary()
-		print("Model prepared")
-		model.evaluate(trainingDataset)
-		model.evaluate(valDataset)
-		model.evaluate(testDataset)
-		model.train(5)
-		model.evaluate(trainingDataset)
-		model.evaluate(valDataset)
-		model.evaluate(testDataset)
-		model.eval(testDataset)
-		model.model.save_weights('../models/try0')
+        with tf.device("/gpu:0"):
+                np.random.seed(7)
+                # Some things taken from https://github.com/benuri/BlazeFace.git
+                trainBatchSize, testBatchSize = 8, 16
+                print("Initializing...")
+                init(trainBatchSize, testBatchSize)
+                print("Initialization Complete!")
+                print("Preparing Model...")
+                model = Model(_alpha = 0.)
+                # model.model.summary()
+                print("Model prepared")
+                model.evaluate(trainingDataset)
+                model.evaluate(valDataset)
+                model.evaluate(testDataset)
+                model.train(5)
+                model.evaluate(trainingDataset)
+                model.evaluate(valDataset)
+                model.evaluate(testDataset)
+                model.eval(testDataset)
+                model.model.save_weights('../models/try0')
 
-		# model.model.load_weights('../models/try1')
-		# model.evaluate(trainingDataset)
-		# model.evaluate(valDataset)
-		# model.evaluate(testDataset)
+       
+                print("Saved model")
+                model2 = Model(_alpha = 0.01)
+                model2.evaluate(testDataset)
+                model2.train(5)
+                model2.evaluate(testDataset)
+                model2.eval(testDataset)
+                model2.model.save_weights('../models/try1_5')
+                model2.train(5)
+                model2.evaluate(testDataset)
+                model2.eval(testDataset)
+                model2.model.save_weights('../models/try1_10')
+                # model.model.load_weights('../models/try1')
+                # model.evaluate(trainingDataset)
+                # model.evaluate(valDataset)
+                # model.evaluate(testDataset)
