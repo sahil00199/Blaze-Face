@@ -1,6 +1,5 @@
 *.pkl
-*.jpg
-*.png
+data/*.png
 data/images/*
 data/processed/images/*
 *__pycache__*
