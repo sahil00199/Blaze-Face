@@ -18,14 +18,14 @@ class DataGenerator(keras.utils.Sequence):
 		########################## Generate the random data
 		annotations = pickle.load(open(os.path.join(self.dataDir, 'annotations.pkl'), 'rb'))
 		images = pickle.load(open(os.path.join(self.dataDir, 'images.pkl'), 'rb'))
-		self.input, self.boundingBoxes, self.classLabels = [], [], []
+		self.input, boundingBoxes, self.classLabels = [], [], []
 		for imageNumber, (imageName, annotation) in enumerate(annotations[split].items()):
 			classLabel, boundingBox = annotation
 			boundingBox[2] += boundingBox[0]
 			boundingBox[3] += boundingBox[1]
 			self.input.append(images[imageName])
 			self.classLabels.append(self.getLabels(classLabel, boundingBox, imageNumber))
-			self.boundingBoxes.append(boundingBox)
+			boundingBoxes.append(boundingBox)
 			# ################################# DEBUG ################################
 			# if split == 'train':
 			# 	if imageNumber == 63: break
@@ -43,10 +43,8 @@ class DataGenerator(keras.utils.Sequence):
 		self.numSamples = len(self.input)
 		self.input = np.array(self.input)
 		self.input = (self.input - 127.5 ) / 127.5
-		self.boundingBoxes = np.array(self.boundingBoxes)
-		self.output = np.asarray([self.convertBoundsToCentreSide(boundingBox, labels) for boundingBox, labels in zip(self.boundingBoxes, self.classLabels)])
-		self.classLabels = np.asarray(self.classLabels)
-		self.classLabels = keras.utils.to_categorical(self.classLabels, num_classes = numClasses + 1)
+		boundingBoxes = np.array(boundingBoxes)
+		self.output = np.asarray([self.convertBoundsToCentreSide(boundingBox, labels) for boundingBox, labels in zip(boundingBoxes, self.classLabels)])
 		print(split, self.input.shape[0])
 		##########################
 		self.on_epoch_end()
@@ -101,7 +99,9 @@ class DataGenerator(keras.utils.Sequence):
 		# Generate indices of the batch
 		indices = self.indices[index*self.batchSize:(index+1)*self.batchSize]
 		X = np.asarray([self.input[index] for index in indices])
-		y = [np.asarray([self.classLabels[index] for index in indices]), np.asarray([self.output[index] for index in indices])]
+		classLabels = np.asarray([self.classLabels[index] for index in indices])
+		classLabels = keras.utils.to_categorical(classLabels, num_classes = numClasses + 1)
+		y = [classLabels, np.asarray([self.output[index] for index in indices])]
 		return X, y
 
 	def on_epoch_end(self):
