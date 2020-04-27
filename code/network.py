@@ -6,7 +6,7 @@ import numpy as np
 def SingleBlazeBlock(input, outputChannels, stride = 1, prefix = "SingleBB"):
 	x = keras.layers.DepthwiseConv2D(5, strides=stride, padding='same', data_format="channels_last", name = prefix + "_DW")(input)
 	x = keras.layers.Conv2D(outputChannels, 1, strides=(1, 1), padding='same', data_format='channels_last', name = prefix + "_1x1")(x)
-	# x = keras.layers.BatchNormalization(name = prefix + '_batchNorm')(x)
+	x = keras.layers.BatchNormalization(name = prefix + '_batchNorm')(x)
 
 	if stride == 2:
 		original = tf.keras.layers.MaxPooling2D(name = prefix + "_MaxPool")(input)
@@ -22,11 +22,11 @@ def SingleBlazeBlock(input, outputChannels, stride = 1, prefix = "SingleBB"):
 def DoubleBlazeBlock(input, outputChannels, intermediateChannels, stride = 1, prefix = "DoubleBB"):
 	x = keras.layers.DepthwiseConv2D(5, strides=stride, padding='same', data_format="channels_last", name = prefix + "_DW1")(input)
 	x = keras.layers.Conv2D(intermediateChannels, 1, strides=(1, 1), padding='same', data_format='channels_last', name = prefix + "_project")(x)
-	# x = keras.layers.BatchNormalization(name = prefix + '_batchNorm1')(x)
+	x = keras.layers.BatchNormalization(name = prefix + '_batchNorm1')(x)
 	x = keras.layers.Activation("relu", name = prefix + "_activation1")(x)
 	x = keras.layers.DepthwiseConv2D(5, strides=1, padding='same', data_format="channels_last", name = prefix + "_DW2")(x)
 	x = keras.layers.Conv2D(outputChannels, 1, strides=(1, 1), padding='same', data_format='channels_last', name = prefix + "_expand")(x)
-	# x = keras.layers.BatchNormalization(name = prefix + '_batchNorm2')(x)
+        x = keras.layers.BatchNormalization(name = prefix + '_batchNorm2')(x)
 
 	if stride == 2:
 		original = tf.keras.layers.MaxPooling2D(name = prefix + "_MaxPool")(input)
@@ -42,7 +42,7 @@ def DoubleBlazeBlock(input, outputChannels, intermediateChannels, stride = 1, pr
 
 def BlazeNet(x):
 	x1 = keras.layers.Conv2D(24, 5, strides=(2, 2), padding='same', data_format='channels_last', name = "initial_conv")(x)
-	# x1 = keras.layers.BatchNormalization()(x1)
+	x1 = keras.layers.BatchNormalization()(x1)
 	x1 = keras.layers.Activation("relu")(x1)
 
 	x2 = SingleBlazeBlock(x1, outputChannels = 24, prefix = "Single1")

@@ -108,6 +108,7 @@ class Model():
                                                 )
 
         def eval(self, dataset):
+                numCorrect, numTotal = 0, 0
                 dataset.on_epoch_end() 
                 batchSize = dataset.batchSize
                 numBatches = (dataset.numSamples + batchSize - 1) // batchSize
@@ -119,12 +120,17 @@ class Model():
                         # loss = boundingBoxLossDebug(groundTruthBox, predictedBoxes)
                         for i, (singlePredictedLabels, singlePredictedBoxes) in enumerate(zip(predictedLabels, predictedBoxes)):
                                 classPrediction, finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
-                                print(classPrediction, groundTruthLabels[i, :, :self.numClasses].argmax() % self.numClasses)
+                                numCorrect += int( classPrediction == groundTruthLabels[i, :, :self.numClasses].argmax() % self.numClasses)
+                                numTotal += 1
                                 finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
                                 singleGroundTruth = dataset.convertCentreSideToBounds(groundTruthBox[i, 0, 1:])
                                 # print(list(zip(finalBoundingBox, singleGroundTruth))[0])
-                                self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, classPrediction, \
-                                        os.path.join('../predictions', str(batchNumber * dataset.batchSize + i) + '.jpg'))
+                                if i == 3:
+                                    self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, classPrediction, \
+                                        os.path.join('../predictions', str(batchNumber) + '.jpg'))
+                                    count += 1
+                print(numCorrect, numTotal)
+                print(float(numCorrect * 100. / numTotal))
 
         def evaluate(self, dataset):
                 self.model.evaluate_generator(generator = dataset,
@@ -160,7 +166,7 @@ class Model():
                 image[:, :, 2:3] = greyscaleImage
                 image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
                 image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
-                cv2.putText(image, str(classPrediction),(0, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,255,0), 1)
+                cv2.putText(image, str(classPrediction),(0, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
                 cv2.imwrite(filename, image)
 
 
@@ -218,6 +224,7 @@ if __name__ == "__main__":
                 init(trainBatchSize, testBatchSize)
                 print("Initialization Complete!")
                 print("Preparing Model...")
+                
                 model = Model(_alpha = 0.)
                 # model.model.summary()
                 print("Model prepared")
@@ -229,21 +236,25 @@ if __name__ == "__main__":
                 model.evaluate(valDataset)
                 model.evaluate(testDataset)
                 model.eval(testDataset)
-                model.model.save_weights('../models/try0')
+                model.model.save_weights('../models/try2')
 
-       
                 print("Saved model")
                 model2 = Model(_alpha = 0.01)
                 model2.evaluate(testDataset)
-                model2.train(5)
-                model2.evaluate(testDataset)
-                model2.eval(testDataset)
-                model2.model.save_weights('../models/try1_5')
-                model2.train(5)
-                model2.evaluate(testDataset)
-                model2.eval(testDataset)
-                model2.model.save_weights('../models/try1_10')
-                # model.model.load_weights('../models/try1')
-                # model.evaluate(trainingDataset)
-                # model.evaluate(valDataset)
-                # model.evaluate(testDataset)
+                for i in range(10):
+                    model2.train(5)
+                    model2.evaluate(testDataset)
+                    model2.eval(testDataset)
+                    model2.eval(trainingDataset)
+                    model2.model.save_weights('../models/try3_' + str(i))
+                
+                '''
+                model = Model(_alpha = 0.01)
+                model.model.load_weights('../models/try1_9')
+                # model.eval(trainingDataset)
+                model.eval(testDataset)
+                model.evaluate(trainingDataset)
+                model.evaluate(valDataset)
+                model.evaluate(testDataset)
+                '''
+

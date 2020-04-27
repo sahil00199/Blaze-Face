@@ -27,10 +27,10 @@ class DataGenerator(keras.utils.Sequence):
                         self.classLabels.append(self.getLabels(classLabel, boundingBox, imageNumber))
                         boundingBoxes.append(boundingBox)
                         # ################################# DEBUG ################################
-                        if split == 'train':
-                                      if imageNumber == 20000: break
-                        else:
-                              if imageNumber == 3000: break
+                        # if split == 'test':
+                        #               if imageNumber == 50000: break
+                        # else:
+                        #       if imageNumber == 30: break
                         # if split == 'train':
                         #       groundTruth = [int(x + 0.5) for x in boundingBox]
                         #       print(imageName, groundTruth)
@@ -67,7 +67,6 @@ class DataGenerator(keras.utils.Sequence):
         def getLabels(self, classLabel, boundingBox, index):
                 global anchors
                 if index % 500 == 0: print(index)
-                return np.asarray([classLabel if self.iou(self.convertCentreSideToBounds(anchor), boundingBox) > 0.5 else classLabel for anchor in self.anchors])
                 return np.asarray([classLabel if self.iou(self.convertCentreSideToBounds(anchor), boundingBox) > 0.5 else self.numClasses for anchor in self.anchors])
 
         def iou(self, a, b):
