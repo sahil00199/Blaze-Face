@@ -6,6 +6,14 @@ from dataset import DataGenerator
 import cv2
 import os
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+  try:
+    for gpu in gpus:
+      tf.config.experimental.set_memory_growth(gpu, True)
+  except RuntimeError as e:
+    print(e)
+
 ##########################################  LOSS ################################################
 def smoothL1(groundTruth, predictions, globalMask):
         # compute smooth L1
@@ -30,6 +38,19 @@ def boundingBoxLoss(groundTruth, predictions):
                         smoothL1(gw, predictions[:, :, 2], mask) +\
                         smoothL1(gh, predictions[:, :, 3], mask)
         return loss * alpha
+
+def weighted_categorical_crossentropy(weights):
+    weights = tf.keras.backend.variable(weights)
+        
+    def loss(y_true, y_pred):
+        # clip to prevent NaN's and Inf's
+        y_pred = tf.keras.backend.clip(y_pred, tf.keras.backend.epsilon(), 1 - tf.keras.backend.epsilon())
+        # calc
+        loss = y_true * tf.keras.backend.log(y_pred) * weights
+        loss = -tf.keras.backend.sum(loss, -1)
+        return loss
+    
+    return loss
 
 
 def smoothL1Debug(groundTruth, predictions, globalMask):
@@ -70,7 +91,8 @@ class Model():
                 output = SSD(features16, features8, numClasses)
                 self.model = tf.keras.models.Model(inputs=inputs, outputs=output)
                 optimizer = tf.keras.optimizers.Adam(amsgrad=True)
-                self.model.compile(loss=['categorical_crossentropy', boundingBoxLoss], optimizer=optimizer)
+                weights = np.array([3.] * self.numClasses + [1./3])
+                self.model.compile(loss=[weighted_categorical_crossentropy(weights), boundingBoxLoss], optimizer=optimizer)
 
         def train(self, numEpochs):
                 # Taken from https://medium.com/@mrgarg.rajat/training-on-large-datasets-that-dont-fit-in-memory-in-keras-60a974785d71
@@ -99,7 +121,6 @@ class Model():
                                 classPrediction, finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
                                 print(classPrediction, groundTruthLabels[i, :, :self.numClasses].argmax() % self.numClasses)
                                 finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
-                                print(groundTruthLabels.shape, groundTruthBox.shape)
                                 singleGroundTruth = dataset.convertCentreSideToBounds(groundTruthBox[i, 0, 1:])
                                 # print(list(zip(finalBoundingBox, singleGroundTruth))[0])
                                 self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, classPrediction, \
