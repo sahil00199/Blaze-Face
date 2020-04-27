@@ -27,10 +27,10 @@ class DataGenerator(keras.utils.Sequence):
 			self.classLabels.append(self.getLabels(classLabel, boundingBox, imageNumber))
 			boundingBoxes.append(boundingBox)
 			# ################################# DEBUG ################################
-			# if split == 'train':
-			# 	if imageNumber == 63: break
-			# else:
-			# 	if imageNumber == 15: break
+			if split == 'train':
+				if imageNumber == 6300: break
+			else:
+				if imageNumber == 1500: break
 			# if split == 'train':
 			# 	groundTruth = [int(x + 0.5) for x in boundingBox]
 			# 	print(imageName, groundTruth)
@@ -42,7 +42,6 @@ class DataGenerator(keras.utils.Sequence):
 
 		self.numSamples = len(self.input)
 		self.input = np.array(self.input)
-		self.input = (self.input - 127.5 ) / 127.5
 		boundingBoxes = np.array(boundingBoxes)
 		self.output = np.asarray([self.convertBoundsToCentreSide(boundingBox, labels) for boundingBox, labels in zip(boundingBoxes, self.classLabels)])
 		print(split, self.input.shape[0])
@@ -99,6 +98,7 @@ class DataGenerator(keras.utils.Sequence):
 		# Generate indices of the batch
 		indices = self.indices[index*self.batchSize:(index+1)*self.batchSize]
 		X = np.asarray([self.input[index] for index in indices])
+		X = (X - 127.5 ) / 127.5
 		classLabels = np.asarray([self.classLabels[index] for index in indices])
 		classLabels = keras.utils.to_categorical(classLabels, num_classes = numClasses + 1)
 		y = [classLabels, np.asarray([self.output[index] for index in indices])]
