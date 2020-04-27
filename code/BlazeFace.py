@@ -59,7 +59,6 @@ def boundingBoxLossDebug(groundTruth, predictions):
 
 
 class Model():
-<<<<<<< HEAD
 	def __init__(self, _alpha = 1., numClasses = 10):
 		global anchors, alpha
 		alpha = _alpha
@@ -141,86 +140,7 @@ class Model():
 		image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
 		image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
 		cv2.putText(image, str(classPrediction),(0, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,255,0), 1)
-
 		cv2.imwrite(filename, image)
-=======
-        def __init__(self, _alpha = 1.):
-                global anchors, alpha
-                alpha = _alpha
-                self.alpha = _alpha
-                self.anchors = anchors
-                inputs = keras.layers.Input(shape=(128, 128, 1), name = "first_input")
-                features16, features8 = BlazeNet(inputs)
-                output = SSD(features16, features8)
-                self.model = tf.keras.models.Model(inputs=inputs, outputs=output)
-                optimizer = tf.keras.optimizers.Adam(amsgrad=True)
-                self.model.compile(loss=['binary_crossentropy', boundingBoxLoss], optimizer=optimizer)
-
-        def train(self):
-                # Taken from https://medium.com/@mrgarg.rajat/training-on-large-datasets-that-dont-fit-in-memory-in-keras-60a974785d71
-                global trainingDataset, valDataset
-                self.model.fit_generator(generator = trainingDataset,
-                                                   steps_per_epoch = len(trainingDataset),
-                                                   epochs = 5,
-                                                   verbose = 1,
-                                                   validation_data = valDataset,
-                                                   validation_steps = len(valDataset),
-                                                   shuffle = True,
-                                                   use_multiprocessing = False
-                                                )
-
-        def eval(self, dataset):
-                dataset.on_epoch_end() 
-                batchSize = dataset.batchSize
-                numBatches = (dataset.numSamples + batchSize - 1) // batchSize
-                for batchNumber in range(numBatches):
-                        currentInput, (groundTruthLabels, groundTruthBox) = dataset.__getitem__(batchNumber)
-                        predictedLabels, predictedBoxes = self.model.predict_on_batch(currentInput)
-                        predictedLabels = predictedLabels.numpy()
-                        predictedBoxes = predictedBoxes.numpy()
-                        # loss = boundingBoxLossDebug(groundTruthBox, predictedBoxes)
-                        for i, (singlePredictedLabels, singlePredictedBoxes) in enumerate(zip(predictedLabels, predictedBoxes)):
-                                finalBoundingBox = self.eliminateMultiple(singlePredictedLabels, singlePredictedBoxes)
-                                finalBoundingBox = dataset.convertCentreSideToBounds(finalBoundingBox)
-                                singleGroundTruth = dataset.convertCentreSideToBounds(groundTruthBox[i, 0, 1:])
-                                # print(list(zip(finalBoundingBox, singleGroundTruth))[0])
-                                if (i == 3):
-                                    self.dumpImage(currentInput[i], singleGroundTruth, finalBoundingBox, \
-                                        os.path.join('../predictions', str(batchNumber) + '.jpg'))
-
-        def evaluate(self, dataset):
-                self.model.evaluate_generator(generator = dataset,
-                                                   verbose = 1,
-                                                   use_multiprocessing = False
-                                                )
-
-        def eliminateMultiple(self, labels, boxes):
-                # Change this function to take into consideration multiple boxes which need to be averaged
-                maxIndex = np.argmax(labels)
-                return self.scaleToCentreSide(boxes[maxIndex], self.anchors[maxIndex])
-
-        def scaleToCentreSide(self, modelOutput, anchor):
-                # Model outputs need to be scaled to actually arrive at the centre and sides of the box
-                assert modelOutput.shape == anchor.shape, print(modelOutput.shape, anchor.shape)
-                cx = anchor[0] + anchor[2] * modelOutput[0]
-                cy = anchor[1] + anchor[3] * modelOutput[1]
-                w = anchor[2] * tf.math.exp(modelOutput[2])
-                h = anchor[3] * tf.math.exp(modelOutput[3])
-                return [cx, cy, w, h]
-
-        def dumpImage(self, greyscaleImage, groundTruth, prediction, filename):
-                groundTruth = [int(x + 0.5) for x in groundTruth]
-                prediction = [int(x + 0.5) for x in prediction]
-                print(list(zip(prediction, groundTruth)))
-                greyscaleImage = (greyscaleImage + 1.0) * 127.5
-                image = np.zeros((128, 128, 3))
-                image[:, :, 0:1] = greyscaleImage
-                image[:, :, 1:2] = greyscaleImage
-                image[:, :, 2:3] = greyscaleImage
-                image = cv2.rectangle(image, (groundTruth[0], groundTruth[1]), (groundTruth[2], groundTruth[3]),(255, 0, 0), thickness = 1)
-                image = cv2.rectangle(image, (prediction[0], prediction[1]), (prediction[2], prediction[3]),(0, 255, 0), thickness = 1)
-                cv2.imwrite(filename, image)
->>>>>>> 27c6fef76ea1bd897d67cde2d49bc81e9cbeccf4
 
 
 ######################################## INITILIAZATION ############################################
